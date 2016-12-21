@@ -7,13 +7,12 @@ DHT dht(DHTPIN, DHTTYPE);
 #include <Ethernet.h>
 //-------------------------------------------------------------------------------
 byte mac[] = { 0xDE, 0xAD, 0xBE, 0xEF, 0xFE, 0xED }; //Setting MAC Address
-#define thing_name "Lyndon_GreenHouse_L9XxcaFseF10D"
-char server[] = "www.dweet.io"; //pushingbox API server
-IPAddress ip(10,6,0,244); //Arduino IP address. Only used when DHCP is turned off.
+char server[] = "api.pushingbox.com"; //pushingbox API server
+IPAddress ip(10,18,0,148); //Arduino IP address. Only used when DHCP is turned off.
 EthernetClient client; //define 'client' as object
 String data; //GET query with data
-float temp; //
-boolean boolv = false;
+float suhu; //suhu (bahasa Indonesia) means temperature
+boolean koneksi = false;
 
 unsigned int localPort = 8888;       // local port to listen for UDP packets
 
@@ -28,15 +27,12 @@ EthernetUDP Udp;
 //------------------------------------------------------------------------------
 void setup() {
 
-  pinMode(5,OUTPUT);
-  pinMode(11,OUTPUT);
-  pinMode(13,OUTPUT);
-  digitalWrite(13,HIGH);
+  pinMode(7,OUTPUT);
+  
   Serial.begin(9600);
   dht.begin();
   if (Ethernet.begin(mac) == 0) {
   Serial.println("Failed to configure Ethernet using DHCP");
-  
   Ethernet.begin(mac, ip);
   Udp.begin(localPort);
   }
@@ -50,28 +46,25 @@ void loop(){
   float h = dht.readHumidity();
    float hif = dht.computeHeatIndex(f, h);
    data+="";
-  data+="GET /dweet/for/"; //GET request query to pushingbox API
-  data+=thing_name;
-  data+="?temp=";
+  data+="GET /pushingbox?devid=vFE7764CDE169915&temp="; //GET request query to pushingbox API
   data+=f;
   data+="&hum=";
   data+=h;
   data+="&index=";
   data+=hif;
-  
   data+=" HTTP/1.1";
-  Serial.println(data);
+
   
    Serial.println("connecting...");
    if (client.connect(server, 80)) {
      sendData();  
-     boolv = true; //connected = true
+     koneksi = true; //connected = true
    }
    else{
      Serial.println("connection failed");
    }
   // loop
-  while(boolv){
+  while(koneksi){
     if (client.available()) {
     char c = client.read(); //save http header to c
     Serial.print(c); //print http header to serial monitor
@@ -82,59 +75,11 @@ void loop(){
           Serial.print("Temperature Sent :");
           Serial.println(f); //print sent value to serial monitor
     client.stop(); 
-          boolv = false; 
+          koneksi = false; 
           data = ""; //data reset
     }
   }
 
-
-
-
-if (f>70){
-  digitalWrite(5,LOW);
-  Serial.println("Motor Run");
-  digitalWrite(11,HIGH);
-}
-else{
-  digitalWrite(5,HIGH);
-  digitalWrite(11,LOW);
-}
-
-
-delay(1200);
-}
-
-void sendData(){
-  Serial.println("connected");
-  client.println(data);
-  client.println("Host: dweet.io");
-  client.println("Connection: close");
-  client.println();
-}
-void sendNTPpacket(char* address) {
-  // set all bytes in the buffer to 0
-  memset(packetBuffer, 0, NTP_PACKET_SIZE);
-  // Initialize values needed to form NTP request
-  // (see URL above for details on the packets)
-  packetBuffer[0] = 0b11100011;   // LI, Version, Mode
-  packetBuffer[1] = 0;     // Stratum, or type of clock
-  packetBuffer[2] = 6;     // Polling Interval
-  packetBuffer[3] = 0xEC;  // Peer Clock Precision
-  // 8 bytes of zero for Root Delay & Root Dispersion
-  packetBuffer[12]  = 49;
-  packetBuffer[13]  = 0x4E;
-  packetBuffer[14]  = 49;
-  packetBuffer[15]  = 52;
-
-  // all NTP fields have been given values, now
-  // you can send a packet requesting a timestamp:
-  Udp.beginPacket(address, 123); //NTP requests are to port 123
-  Udp.write(packetBuffer, NTP_PACKET_SIZE);
-  Udp.endPacket();
-}
-
-/*
- * 
   //------------------TIME Check -------------------
 sendNTPpacket(timeServer); // send an NTP packet to a time server
 int Hour = 0;
@@ -171,6 +116,58 @@ int Hour = 0;
     
   }
    Ethernet.maintain();
-   */
- 
+   
+
+
+
+
+if ((Hour >7) && (Hour <19))
+{
+ Serial.println("In Work Time, It is going to check the temp!");
+if (f>85){
+  digitalWrite(7,HIGH);
+  Serial.println("Motor Run");
+}
+else{
+  digitalWrite(7,LOW);
+}
+
+
+}
+else{
+  digitalWrite(7,LOW);
+}
+delay(120000);
+}
+
+void sendData(){
+  Serial.println("connected");
+  client.println(data);
+  client.println("Host: api.pushingbox.com");
+  client.println("Connection: close");
+  client.println();
+}
+void sendNTPpacket(char* address) {
+  // set all bytes in the buffer to 0
+  memset(packetBuffer, 0, NTP_PACKET_SIZE);
+  // Initialize values needed to form NTP request
+  // (see URL above for details on the packets)
+  packetBuffer[0] = 0b11100011;   // LI, Version, Mode
+  packetBuffer[1] = 0;     // Stratum, or type of clock
+  packetBuffer[2] = 6;     // Polling Interval
+  packetBuffer[3] = 0xEC;  // Peer Clock Precision
+  // 8 bytes of zero for Root Delay & Root Dispersion
+  packetBuffer[12]  = 49;
+  packetBuffer[13]  = 0x4E;
+  packetBuffer[14]  = 49;
+  packetBuffer[15]  = 52;
+
+  // all NTP fields have been given values, now
+  // you can send a packet requesting a timestamp:
+  Udp.beginPacket(address, 123); //NTP requests are to port 123
+  Udp.write(packetBuffer, NTP_PACKET_SIZE);
+  Udp.endPacket();
+}
+
+
 
